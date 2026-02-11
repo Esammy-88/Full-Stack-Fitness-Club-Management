@@ -5,8 +5,6 @@ A comprehensive web-based fitness club management platform
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from functools import wraps
-import psycopg
-from psycopg import pool
 from datetime import datetime, date, time
 import os
 from psycopg_pool import ConnectionPool
@@ -16,8 +14,6 @@ app = Flask(__name__)
 app.secret_key = os.environ.get(
     'SECRET_KEY', 'dev-secret-key-change-in-production'
 )
-
-init_db_pool()
 
 
 # Database connection pool
@@ -64,6 +60,8 @@ def get_db_connection():
 def return_db_connection(conn):
     """Return connection to pool"""
     connection_pool.putconn(conn)
+
+init_db_pool() 
 
 # Decorators for authentication
 
