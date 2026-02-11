@@ -23,27 +23,31 @@ init_db_pool()
 # Database connection pool
 connection_pool = None
 
-
 def init_db_pool():
-    """Initialize database connection pool"""
     global connection_pool
 
     database_url = os.environ.get("DATABASE_URL")
 
     try:
         if database_url:
-            connection_pool = psycopg2.pool.SimpleConnectionPool(
-                1, 20,
-                dsn=database_url
+            connection_pool = ConnectionPool(
+                conninfo=database_url,
+                min_size=1,
+                max_size=20
             )
         else:
-            connection_pool = psycopg2.pool.SimpleConnectionPool(
-                1, 20,
-                host=os.environ.get("DB_HOST", "localhost"),
-                database=os.environ.get("DB_NAME", "fitness_club"),
-                user=os.environ.get("DB_USER", "postgres"),
-                password=os.environ.get("DB_PASSWORD"),
-                port=os.environ.get("DB_PORT", "5432")
+            conninfo = (
+                f"host={os.environ.get('DB_HOST', 'localhost')} "
+                f"dbname={os.environ.get('DB_NAME', 'fitness_club')} "
+                f"user={os.environ.get('DB_USER', 'postgres')} "
+                f"password={os.environ.get('DB_PASSWORD')} "
+                f"port={os.environ.get('DB_PORT', '5432')}"
+            )
+
+            connection_pool = ConnectionPool(
+                conninfo=conninfo,
+                min_size=1,
+                max_size=20
             )
 
         print("✓ Database connection pool initialized")
@@ -51,7 +55,6 @@ def init_db_pool():
     except Exception as e:
         print(f"✗ Database initialization failed: {e}")
         raise
-
 
 def get_db_connection():
     """Get connection from pool"""
