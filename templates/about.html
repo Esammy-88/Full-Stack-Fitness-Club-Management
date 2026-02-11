@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}About the Developer{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Developer Profile Card -->
+            <div class="card shadow-lg mb-5">
+                <div class="card-body p-5">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 text-center mb-4 mb-md-0">
+                            <img src="https://via.placeholder.com/200" alt="Developer Photo" 
+                                 class="img-fluid rounded-circle shadow mb-3">
+                            <h3 class="fw-bold">Your Name</h3>
+                            <p class="text-muted">Full-Stack Developer</p>
+                            <div class="social-links">
+                                <a href="https://github.com/yourusername" target="_blank" class="btn btn-outline-dark btn-sm mx-1">
+                                    <i class="fab fa-github"></i> GitHub
+                                </a>
+                                <a href="https://linkedin.com/in/yourprofile" target="_blank" class="btn btn-outline-primary btn-sm mx-1">
+                                    <i class="fab fa-linkedin"></i> LinkedIn
+                                </a>
+                                <a href="mailto:your.email@example.com" class="btn btn-outline-danger btn-sm mx-1">
+                                    <i class="fas fa-envelope"></i> Email
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <h4 class="mb-3">About This Project</h4>
+                            <p class="text-muted">
+                                The Health & Fitness Club Management System is a comprehensive web application 
+                                developed to demonstrate full-stack development capabilities. This project showcases 
+                                proficiency in database design, backend development with Python/Flask, and modern 
+                                frontend design with Bootstrap.
+                            </p>
+                            <p class="text-muted mb-4">
+                                The system manages all aspects of a fitness club including member registration, 
+                                trainer scheduling, class management, equipment tracking, and billing operations.
+                            </p>
+                            <a href="https://github.com/yourusername/fitness-club" target="_blank" class="btn btn-primary">
+                                <i class="fab fa-github"></i> View Source Code
+                            </a>
+                            <a href="path/to/resume.pdf" target="_blank" class="btn btn-outline-primary">
+                                <i class="fas fa-file-pdf"></i> Download Resume
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Skills -->
+            <div class="card shadow mb-5">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-code"></i> Technical Skills</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Backend Development</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> Python (Flask, Django)</li>
+                                <li><i class="fas fa-check text-success"></i> RESTful API Design</li>
+                                <li><i class="fas fa-check text-success"></i> Database Design & SQL</li>
+                                <li><i class="fas fa-check text-success"></i> PostgreSQL, MySQL</li>
+                                <li><i class="fas fa-check text-success"></i> Authentication & Security</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Frontend Development</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> HTML5, CSS3, JavaScript</li>
+                                <li><i class="fas fa-check text-success"></i> Bootstrap, Tailwind CSS</li>
+                                <li><i class="fas fa-check text-success"></i> React, Vue.js</li>
+                                <li><i class="fas fa-check text-success"></i> Responsive Design</li>
+                                <li><i class="fas fa-check text-success"></i> UI/UX Best Practices</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Features -->
+            <div class="card shadow mb-5">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-star"></i> Key Features Implemented</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="feature-item p-3 border rounded">
+                                <h6 class="fw-bold"><i class="fas fa-users text-primary"></i> Multi-Role System</h6>
+                                <p class="small text-muted mb-0">Separate interfaces for members, trainers, and administrators with role-based access control.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-item p-3 border rounded">
+                                <h6 class="fw-bold"><i class="fas fa-database text-info"></i> Complex Database Schema</h6>
+                                <p class="small text-muted mb-0">12+ interconnected tables with proper relationships, constraints, and triggers.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-item p-3 border rounded">
+                                <h6 class="fw-bold"><i class="fas fa-chart-line text-success"></i> Real-time Analytics</h6>
+                                <p class="small text-muted mb-0">Dynamic dashboards with fitness tracking, goal monitoring, and progress visualization.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-item p-3 border rounded">
+                                <h6 class="fw-bold"><i class="fas fa-calendar-check text-warning"></i> Smart Scheduling</h6>
+                                <p class="small text-muted mb-0">Conflict detection, availability checking, and automated room assignment.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-item p-3 border rounded">
+                                <h6 class="fw-bold"><i class="fas fa-shield-alt text-danger"></i> Secure Authentication</h6>
+                                <p class="small text-muted mb-0">Session management, password protection, and secure data handling.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-item p-3 border rounded">
+                                <h6 class="fw-bold"><i class="fas fa-mobile-alt text-purple"></i> Responsive Design</h6>
+                                <p class="small text-muted mb-0">Mobile-first approach ensuring seamless experience across all devices.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Architecture -->
+            <div class="card shadow mb-5">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="fas fa-project-diagram"></i> Database Architecture</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        The system utilizes a normalized relational database design with the following key entities:
+                    </p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-table text-primary"></i> <strong>Members</strong> - User accounts and profiles</li>
+                                <li><i class="fas fa-table text-primary"></i> <strong>Trainers</strong> - Staff and specializations</li>
+                                <li><i class="fas fa-table text-primary"></i> <strong>Classes</strong> - Group fitness sessions</li>
+                                <li><i class="fas fa-table text-primary"></i> <strong>Personal Training</strong> - 1-on-1 sessions</li>
+                                <li><i class="fas fa-table text-primary"></i> <strong>Fitness Goals</strong> - Member objectives</li>
+                                <li><i class="fas fa-table text-primary"></i> <strong>Health Metrics</strong> - Progress tracking</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-table text-success"></i> <strong>Rooms</strong> - Facility management</li>
+                                <li><i class="fas fa-table text-success"></i> <strong>Equipment</strong> - Asset tracking</li>
+                                <li><i class="fas fa-table text-success"></i> <strong>Billing</strong> - Payment processing</li>
+                                <li><i class="fas fa-table text-success"></i> <strong>Payments</strong> - Transaction records</li>
+                                <li><i class="fas fa-table text-success"></i> <strong>Availability</strong> - Trainer schedules</li>
+                                <li><i class="fas fa-table text-success"></i> <strong>Registrations</strong> - Class enrollments</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle"></i> Includes advanced features like database triggers, views, indexes, and constraints for data integrity.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact CTA -->
+            <div class="card shadow bg-primary text-white text-center">
+                <div class="card-body p-5">
+                    <h3 class="fw-bold mb-3">Interested in Working Together?</h3>
+                    <p class="lead mb-4">I'm always open to discussing new opportunities and exciting projects!</p>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="mailto:your.email@example.com" class="btn btn-light btn-lg">
+                            <i class="fas fa-envelope"></i> Get In Touch
+                        </a>
+                        <a href="path/to/resume.pdf" target="_blank" class="btn btn-outline-light btn-lg">
+                            <i class="fas fa-download"></i> Download Resume
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

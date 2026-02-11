@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - FitClub Pro{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero-section text-white text-center">
+    <div class="container">
+        <div class="row align-items-center min-vh-75">
+            <div class="col-lg-8 mx-auto">
+                <h1 class="display-3 fw-bold mb-4">
+                    <i class="fas fa-dumbbell"></i> FitClub Pro
+                </h1>
+                <p class="lead mb-5">
+                    Your Complete Health & Fitness Club Management Solution
+                </p>
+                <div class="d-grid gap-3 d-md-flex justify-content-md-center">
+                    <a href="{{ url_for('member_register') }}" class="btn btn-light btn-lg px-5">
+                        <i class="fas fa-user-plus"></i> Join Now
+                    </a>
+                    <a href="{{ url_for('member_login') }}" class="btn btn-outline-light btn-lg px-5">
+                        <i class="fas fa-sign-in-alt"></i> Member Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="container my-5">
+    <div class="row text-center mb-5">
+        <div class="col">
+            <h2 class="display-5 fw-bold mb-3">Why Choose FitClub Pro?</h2>
+            <p class="lead text-muted">Comprehensive features for members, trainers, and administrators</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Member Features -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon bg-primary text-white rounded-circle mx-auto mb-3">
+                        <i class="fas fa-user fa-2x"></i>
+                    </div>
+                    <h4 class="card-title mb-3">For Members</h4>
+                    <ul class="list-unstyled text-start">
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Personalized Dashboard</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Track Fitness Goals</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Health Metrics Logging</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Book Training Sessions</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Register for Classes</li>
+                    </ul>
+                    <a href="{{ url_for('member_register') }}" class="btn btn-primary mt-3">Get Started</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trainer Features -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon bg-success text-white rounded-circle mx-auto mb-3">
+                        <i class="fas fa-chalkboard-teacher fa-2x"></i>
+                    </div>
+                    <h4 class="card-title mb-3">For Trainers</h4>
+                    <ul class="list-unstyled text-start">
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Manage Schedule</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Set Availability</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> View Member Progress</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Track Client Goals</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Class Management</li>
+                    </ul>
+                    <a href="{{ url_for('trainer_login') }}" class="btn btn-success mt-3">Trainer Portal</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Features -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon bg-warning text-white rounded-circle mx-auto mb-3">
+                        <i class="fas fa-cog fa-2x"></i>
+                    </div>
+                    <h4 class="card-title mb-3">For Admins</h4>
+                    <ul class="list-unstyled text-start">
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Room Management</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Equipment Tracking</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Billing & Payments</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Analytics Dashboard</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Staff Oversight</li>
+                    </ul>
+                    <a href="{{ url_for('admin_login') }}" class="btn btn-warning mt-3">Admin Access</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Section -->
+<div class="bg-light py-5 my-5">
+    <div class="container">
+        <div class="row text-center g-4">
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <h2 class="display-4 fw-bold text-primary">500+</h2>
+                    <p class="text-muted">Active Members</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <h2 class="display-4 fw-bold text-success">50+</h2>
+                    <p class="text-muted">Expert Trainers</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <h2 class="display-4 fw-bold text-warning">100+</h2>
+                    <p class="text-muted">Weekly Classes</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <h2 class="display-4 fw-bold text-danger">24/7</h2>
+                    <p class="text-muted">Access Available</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technology Stack Section -->
+<div class="container my-5">
+    <div class="row text-center mb-4">
+        <div class="col">
+            <h2 class="display-5 fw-bold mb-3">Built With Modern Technology</h2>
+            <p class="lead text-muted">Full-stack web application demonstrating professional development skills</p>
+        </div>
+    </div>
+    <div class="row g-3 text-center">
+        <div class="col-md-2 col-6">
+            <div class="tech-badge">
+                <i class="fab fa-python fa-3x text-primary"></i>
+                <p class="mt-2 mb-0 small">Python</p>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="tech-badge">
+                <i class="fab fa-python fa-3x text-success"></i>
+                <p class="mt-2 mb-0 small">Flask</p>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="tech-badge">
+                <i class="fas fa-database fa-3x text-info"></i>
+                <p class="mt-2 mb-0 small">PostgreSQL</p>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="tech-badge">
+                <i class="fab fa-bootstrap fa-3x" style="color: #7952b3;"></i>
+                <p class="mt-2 mb-0 small">Bootstrap</p>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="tech-badge">
+                <i class="fab fa-html5 fa-3x text-danger"></i>
+                <p class="mt-2 mb-0 small">HTML5</p>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="tech-badge">
+                <i class="fab fa-js fa-3x text-warning"></i>
+                <p class="mt-2 mb-0 small">JavaScript</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CTA Section -->
+<div class="cta-section text-white text-center py-5 my-5">
+    <div class="container">
+        <h2 class="display-5 fw-bold mb-3">Ready to Transform Your Fitness Journey?</h2>
+        <p class="lead mb-4">Join hundreds of members already achieving their goals</p>
+        <a href="{{ url_for('member_register') }}" class="btn btn-light btn-lg px-5">
+            <i class="fas fa-rocket"></i> Start Free Trial
+        </a>
+    </div>
+</div>
+{% endblock %}

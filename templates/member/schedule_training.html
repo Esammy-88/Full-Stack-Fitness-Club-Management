@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Schedule Training{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <h2 class="mb-4"><i class="fas fa-calendar-plus"></i> Schedule Personal Training</h2>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Select Trainer</label>
+                            <select class="form-select" name="trainer_id" required>
+                                <option value="">Choose a trainer...</option>
+                                {% for t in trainers %}
+                                <option value="{{ t[0] }}">{{ t[1] }} {{ t[2] }} - {{ t[3] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Session Date</label>
+                            <input type="date" class="form-control" name="session_date" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" class="form-control" name="start_time" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">End Time</label>
+                                <input type="time" class="form-control" name="end_time" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notes (Optional)</label>
+                            <textarea class="form-control" name="notes" rows="3" placeholder="Any specific focus areas?"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-check"></i> Book Session
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

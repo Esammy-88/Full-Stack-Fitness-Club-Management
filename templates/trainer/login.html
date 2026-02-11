@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Classes{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <h2 class="mb-4"><i class="fas fa-users"></i> Available Classes</h2>
+    
+    <div class="row">
+        {% if classes %}
+            {% for c in classes %}
+            <div class="col-md-6 mb-4">
+                <div class="card shadow hover-lift">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ c[1] }}</h5>
+                        <p class="card-text">
+                            <i class="fas fa-calendar"></i> {{ c[2] }}<br>
+                            <i class="fas fa-clock"></i> {{ c[3] }} - {{ c[4] }}<br>
+                            <i class="fas fa-chalkboard-teacher"></i> {{ c[5] }}<br>
+                            <i class="fas fa-user-friends"></i> {{ c[8] }} spots left ({{ c[6] }}/{{ c[7] }} enrolled)
+                        </p>
+                        <form method="POST" class="d-inline">
+                            <input type="hidden" name="class_id" value="{{ c[0] }}">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-plus"></i> Register
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    No classes available for registration at this time.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <h2 class="mb-4"><i class="fas fa-tachometer-alt"></i> Welcome, {{ session.user_name }}!</h2>
+    
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="metric-card bg-primary text-white">
+                <div class="metric-value">{{ dashboard[6] }}</div>
+                <div class="metric-label">Active Goals</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-success text-white">
+                <div class="metric-value">{{ dashboard[7] }}</div>
+                <div class="metric-label">Upcoming Sessions</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-info text-white">
+                <div class="metric-value">{{ dashboard[8] }}</div>
+                <div class="metric-label">Classes Attended</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-warning text-white">
+                <div class="metric-value">${{ "%.2f"|format(dashboard[9]) }}</div>
+                <div class="metric-label">Pending Balance</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bullseye"></i> Your Goals</h5>
+                </div>
+                <div class="card-body">
+                    {% if goals %}
+                        {% for goal in goals %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <strong>{{ goal[1] }}</strong>
+                                <span>{{ goal[2] }}/{{ goal[3] }}</span>
+                            </div>
+                            <div class="goal-progress">
+                                <div class="goal-progress-bar" style="width: {{ (goal[2]/goal[3]*100) if goal[3] else 0 }}%">
+                                    {{ "%.0f"|format(goal[2]/goal[3]*100 if goal[3] else 0) }}%
+                                </div>
+                            </div>
+                            <small class="text-muted">Target: {{ goal[4] }}</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No active goals. <a href="{{ url_for('member_profile') }}">Set a goal</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar-check"></i> Upcoming Sessions</h5>
+                </div>
+                <div class="card-body">
+                    {% if sessions %}
+                        {% for s in sessions %}
+                        <div class="schedule-item training mb-2">
+                            <strong>{{ s[1] }}</strong> at {{ s[2] }}<br>
+                            <small>Trainer: {{ s[4] }} | Room: {{ s[5] }}</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No upcoming sessions. <a href="{{ url_for('schedule_training') }}">Book now</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

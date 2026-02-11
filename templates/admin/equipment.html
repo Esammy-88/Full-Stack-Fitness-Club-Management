@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Equipment Management{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <h2 class="mb-4"><i class="fas fa-tools"></i> Equipment Management</h2>
+    
+    <div class="card shadow">
+        <div class="card-body">
+            <table class="table table-custom">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Equipment</th>
+                        <th>Room</th>
+                        <th>Status</th>
+                        <th>Last Maintenance</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in equipment %}
+                    <tr>
+                        <td>{{ e[0] }}</td>
+                        <td>{{ e[1] }}</td>
+                        <td>{{ e[2] or 'N/A' }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if e[3]=='Operational' else 'warning' }}">
+                                {{ e[3] }}
+                            </span>
+                        </td>
+                        <td>{{ e[4] or 'Never' }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#updateModal{{ e[0] }}">
+                                Update
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

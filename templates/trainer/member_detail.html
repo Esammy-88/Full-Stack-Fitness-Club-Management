@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Member Details{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <h2 class="mb-4"><i class="fas fa-user"></i> Member Details</h2>
+    
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">{{ member[0] }} {{ member[1] }}</h5>
+        </div>
+        <div class="card-body">
+            <p>
+                <strong>Email:</strong> {{ member[2] }}<br>
+                <strong>Phone:</strong> {{ member[4] }}<br>
+                <strong>Date of Birth:</strong> {{ member[3] }}
+            </p>
+        </div>
+    </div>
+    
+    {% if metric %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Latest Health Metrics</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Recorded: {{ metric[5] }}</p>
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>Weight:</strong> {{ metric[0] }} lbs
+                </div>
+                <div class="col-md-3">
+                    <strong>Height:</strong> {{ metric[1] }} in
+                </div>
+                <div class="col-md-3">
+                    <strong>Heart Rate:</strong> {{ metric[2] }} bpm
+                </div>
+                <div class="col-md-3">
+                    <strong>BP:</strong> {{ metric[3] }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if goals %}
+    <div class="card shadow">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Active Goals</h5>
+        </div>
+        <div class="card-body">
+            {% for g in goals %}
+            <div class="mb-3">
+                <strong>{{ g[0] }}</strong><br>
+                Progress: {{ g[1] }} / {{ g[2] }}<br>
+                <small class="text-muted">Target Date: {{ g[3] }}</small>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}My Members{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <h2 class="mb-4"><i class="fas fa-users"></i> My Members</h2>
+    
+    <div class="row">
+        {% if members %}
+            {% for m in members %}
+            <div class="col-md-6 mb-3">
+                <div class="card hover-lift">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ m[1] }} {{ m[2] }}</h5>
+                        <p class="card-text">
+                            <i class="fas fa-envelope"></i> {{ m[3] }}<br>
+                            <i class="fas fa-phone"></i> {{ m[4] }}
+                        </p>
+                        <a href="{{ url_for('trainer_member_detail', member_id=m[0]) }}" class="btn btn-primary">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">No members assigned yet.</div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
