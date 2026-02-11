@@ -5,7 +5,7 @@ A comprehensive web-based fitness club management platform
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from functools import wraps
-import psycopg2
+import psycopg
 from psycopg2 import pool
 from datetime import datetime, date, time
 import os
