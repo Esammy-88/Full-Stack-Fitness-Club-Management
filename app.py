@@ -9,11 +9,16 @@ import psycopg
 from psycopg import pool
 from datetime import datetime, date, time
 import os
+from psycopg_pool import ConnectionPool
+
 
 app = Flask(__name__)
-init_db_pool() 
 app.secret_key = os.environ.get(
-    'SECRET_KEY', 'dev-secret-key-change-in-production')
+    'SECRET_KEY', 'dev-secret-key-change-in-production'
+)
+
+init_db_pool()
+
 
 # Database connection pool
 connection_pool = None
