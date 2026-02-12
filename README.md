@@ -18,7 +18,6 @@ A comprehensive web-based fitness club management platform built with Python Fla
 - [Environment Variables](#environment-variables)
 - [Deploying to Render](#deploying-to-render)
 - [Demo Credentials](#demo-credentials)
-- [Screenshots](#screenshots)
 
 ---
 
