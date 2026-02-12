@@ -1,6 +1,7 @@
 """
 Health and Fitness Club Management System - Flask Web Application
-Updated for secure password handling and robust connection pooling
+Supports both plain-text (legacy DML) and hashed passwords during transition.
+Run migrate_passwords.py once to fully migrate to hashed passwords.
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash
@@ -12,11 +13,9 @@ from psycopg_pool import ConnectionPool
 from werkzeug.security import generate_password_hash, check_password_hash
 from urllib.parse import urlparse, parse_qs, urlunparse, urlencode
 
-# Fix static folder path explicitly for Render
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get(
-    'SECRET_KEY', 'dev-secret-key-change-in-production'
-)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
 
 # ============================================================================
 # DATABASE CONNECTION POOL
@@ -25,12 +24,23 @@ app.secret_key = os.environ.get(
 connection_pool = None
 
 
+def get_ssl_url(database_url):
+    """Add sslmode=require to DATABASE_URL if not already present."""
+    if database_url.startswith("postgres://") or database_url.startswith("postgresql://"):
+        url = urlparse(database_url)
+        qs = parse_qs(url.query)
+        if "sslmode" not in qs:
+            qs["sslmode"] = ["require"]
+        url = url._replace(query=urlencode(qs, doseq=True))
+        return urlunparse(url)
+    return database_url
+
+
 def init_db_pool():
     global connection_pool
     database_url = os.environ.get("DATABASE_URL")
 
     if not database_url:
-        # Fall back to individual env vars
         database_url = (
             f"host={os.environ.get('DB_HOST', 'localhost')} "
             f"dbname={os.environ.get('DB_NAME', 'fitness_club')} "
@@ -39,14 +49,7 @@ def init_db_pool():
             f"port={os.environ.get('DB_PORT', '5432')}"
         )
     else:
-        # SSL-safe for Render — add sslmode=require if not already present
-        if database_url.startswith("postgres://") or database_url.startswith("postgresql://"):
-            url = urlparse(database_url)
-            qs = parse_qs(url.query)
-            if "sslmode" not in qs:
-                qs["sslmode"] = ["require"]
-            url = url._replace(query=urlencode(qs, doseq=True))
-            database_url = urlunparse(url)
+        database_url = get_ssl_url(database_url)
 
     try:
         connection_pool = ConnectionPool(
@@ -56,23 +59,20 @@ def init_db_pool():
             timeout=30,
             reconnect_timeout=60
         )
-        # Verify the pool works immediately on startup
+        # Verify pool works immediately on startup
         conn = connection_pool.getconn()
         connection_pool.putconn(conn)
         print("✓ Database connection pool initialized and verified")
-
     except Exception as e:
         print(f"✗ Database initialization failed: {e}")
         raise
 
 
 def get_db_connection():
-    """Get a connection from the pool."""
     return connection_pool.getconn()
 
 
 def return_db_connection(conn):
-    """Return a connection to the pool safely."""
     if conn is not None:
         try:
             connection_pool.putconn(conn)
@@ -81,7 +81,6 @@ def return_db_connection(conn):
 
 
 def close_db_pool():
-    """Close all pool connections cleanly on shutdown."""
     global connection_pool
     if connection_pool:
         try:
@@ -96,11 +95,32 @@ init_db_pool()
 
 
 # ============================================================================
+# PASSWORD HELPERS
+# ============================================================================
+
+def verify_password(stored_password: str, provided_password: str) -> bool:
+    """
+    Verify a password against the stored value.
+    Handles both:
+      - Hashed passwords (werkzeug format: 'pbkdf2:...' or 'scrypt:...')
+      - Plain-text passwords (legacy DML users, before migration)
+    After running migrate_passwords.py, all passwords will be hashed
+    and this fallback will never be used.
+    """
+    if stored_password is None:
+        return False
+    # Check if it's a werkzeug hash
+    if stored_password.startswith("pbkdf2:") or stored_password.startswith("scrypt:"):
+        return check_password_hash(stored_password, provided_password)
+    # Legacy plain-text fallback (DML users before migration)
+    return stored_password == provided_password
+
+
+# ============================================================================
 # AUTHENTICATION DECORATORS
 # ============================================================================
 
 def login_required(user_type):
-    """Decorator to require login for specific user types"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -132,30 +152,28 @@ def about():
 
 @app.route('/member/register', methods=['GET', 'POST'])
 def member_register():
-    """Member registration with hashed passwords"""
+    """Member registration — stores hashed password"""
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        email      = request.form.get('email')
+        password   = request.form.get('password')
         first_name = request.form.get('first_name')
-        last_name = request.form.get('last_name')
-        dob = request.form.get('date_of_birth')
-        gender = request.form.get('gender')
-        phone = request.form.get('phone')
-        address = request.form.get('address')
+        last_name  = request.form.get('last_name')
+        dob        = request.form.get('date_of_birth')
+        gender     = request.form.get('gender')
+        phone      = request.form.get('phone')
+        address    = request.form.get('address')
 
         conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # Check if email exists
             cursor.execute("SELECT email FROM Member WHERE email = %s", (email,))
             if cursor.fetchone():
                 cursor.close()
                 flash('Email already registered!', 'danger')
                 return redirect(url_for('member_register'))
 
-            # Insert new member with hashed password
             hashed_pw = generate_password_hash(password)
             cursor.execute("""
                 INSERT INTO Member (email, password, first_name, last_name, date_of_birth,
@@ -184,9 +202,9 @@ def member_register():
 
 @app.route('/member/login', methods=['GET', 'POST'])
 def member_login():
-    """Member login using hashed password"""
+    """Member login — works for both DML plain-text and hashed passwords"""
     if request.method == 'POST':
-        email = request.form.get('email')
+        email    = request.form.get('email')
         password = request.form.get('password')
 
         conn = None
@@ -200,8 +218,8 @@ def member_login():
             user = cursor.fetchone()
             cursor.close()
 
-            if user and check_password_hash(user[3], password):
-                session['user_id'] = user[0]
+            if user and verify_password(user[3], password):
+                session['user_id']   = user[0]
                 session['user_type'] = 'member'
                 session['user_name'] = f"{user[1]} {user[2]}"
                 flash(f'Welcome back, {user[1]}!', 'success')
@@ -220,7 +238,6 @@ def member_login():
 @app.route('/member/dashboard')
 @login_required('member')
 def member_dashboard():
-    """Member dashboard"""
     member_id = session['user_id']
     conn = None
 
@@ -232,8 +249,7 @@ def member_dashboard():
             SELECT first_name, last_name, email, latest_weight, latest_heart_rate,
                    last_metric_date, active_goals, upcoming_sessions,
                    classes_attended, pending_balance
-            FROM MemberDashboard
-            WHERE member_id = %s
+            FROM MemberDashboard WHERE member_id = %s
         """, (member_id,))
         dashboard_data = cursor.fetchone()
 
@@ -247,8 +263,7 @@ def member_dashboard():
 
         cursor.execute("""
             SELECT pts.session_id, pts.session_date, pts.start_time, pts.end_time,
-                   t.first_name || ' ' || t.last_name as trainer_name,
-                   r.room_name
+                   t.first_name || ' ' || t.last_name as trainer_name, r.room_name
             FROM PersonalTrainingSession pts
             JOIN Trainer t ON pts.trainer_id = t.trainer_id
             JOIN Room r ON pts.room_id = r.room_id
@@ -262,8 +277,7 @@ def member_dashboard():
 
         cursor.execute("""
             SELECT c.class_id, c.class_name, c.schedule_date, c.start_time, c.end_time,
-                   t.first_name || ' ' || t.last_name as trainer_name,
-                   cr.status
+                   t.first_name || ' ' || t.last_name as trainer_name, cr.status
             FROM ClassRegistration cr
             JOIN Class c ON cr.class_id = c.class_id
             JOIN Trainer t ON c.trainer_id = t.trainer_id
@@ -290,7 +304,6 @@ def member_dashboard():
 @app.route('/member/profile', methods=['GET', 'POST'])
 @login_required('member')
 def member_profile():
-    """Member profile management"""
     member_id = session['user_id']
 
     if request.method == 'POST':
@@ -302,21 +315,19 @@ def member_profile():
             cursor = conn.cursor()
 
             if action == 'update_info':
-                phone = request.form.get('phone')
+                phone   = request.form.get('phone')
                 address = request.form.get('address')
                 cursor.execute("""
-                    UPDATE Member
-                    SET phone = %s, address = %s
-                    WHERE member_id = %s
+                    UPDATE Member SET phone = %s, address = %s WHERE member_id = %s
                 """, (phone, address, member_id))
                 conn.commit()
                 flash('Profile updated successfully!', 'success')
 
             elif action == 'add_goal':
-                goal_type = request.form.get('goal_type')
-                target_value = request.form.get('target_value')
+                goal_type     = request.form.get('goal_type')
+                target_value  = request.form.get('target_value')
                 current_value = request.form.get('current_value')
-                target_date = request.form.get('target_date')
+                target_date   = request.form.get('target_date')
                 cursor.execute("""
                     INSERT INTO FitnessGoal (member_id, goal_type, target_value,
                                             current_value, target_date, status)
@@ -326,12 +337,12 @@ def member_profile():
                 flash('Fitness goal added!', 'success')
 
             elif action == 'add_metric':
-                weight = request.form.get('weight')
-                height = request.form.get('height')
-                heart_rate = request.form.get('heart_rate')
+                weight        = request.form.get('weight')
+                height        = request.form.get('height')
+                heart_rate    = request.form.get('heart_rate')
                 blood_pressure = request.form.get('blood_pressure')
-                body_fat = request.form.get('body_fat')
-                notes = request.form.get('notes')
+                body_fat      = request.form.get('body_fat')
+                notes         = request.form.get('notes')
                 cursor.execute("""
                     INSERT INTO HealthMetric (member_id, weight, height, heart_rate,
                                              blood_pressure, body_fat_percentage, notes)
@@ -373,25 +384,19 @@ def member_profile():
             SELECT metric_id, recorded_date, weight, heart_rate, blood_pressure,
                    body_fat_percentage, notes
             FROM HealthMetric
-            WHERE member_id = %s
-            ORDER BY recorded_date DESC
-            LIMIT 10
+            WHERE member_id = %s ORDER BY recorded_date DESC LIMIT 10
         """, (member_id,))
         metrics = cursor.fetchall()
 
         cursor.execute("""
             SELECT goal_id, goal_type, current_value, target_value, target_date, status
-            FROM FitnessGoal
-            WHERE member_id = %s
-            ORDER BY created_date DESC
+            FROM FitnessGoal WHERE member_id = %s ORDER BY created_date DESC
         """, (member_id,))
         goals = cursor.fetchall()
         cursor.close()
 
         return render_template('member/profile.html',
-                               profile=profile,
-                               metrics=metrics,
-                               goals=goals)
+                               profile=profile, metrics=metrics, goals=goals)
     except Exception as e:
         flash(f'Error loading profile: {str(e)}', 'danger')
         return redirect(url_for('member_dashboard'))
@@ -402,31 +407,26 @@ def member_profile():
 @app.route('/member/schedule-training', methods=['GET', 'POST'])
 @login_required('member')
 def schedule_training():
-    """Schedule personal training session"""
     member_id = session['user_id']
 
     if request.method == 'POST':
-        trainer_id = request.form.get('trainer_id')
+        trainer_id   = request.form.get('trainer_id')
         session_date = request.form.get('session_date')
-        start_time = request.form.get('start_time')
-        end_time = request.form.get('end_time')
-        notes = request.form.get('notes')
+        start_time   = request.form.get('start_time')
+        end_time     = request.form.get('end_time')
+        notes        = request.form.get('notes')
 
         conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # Check trainer availability
             day_of_week = datetime.strptime(session_date, '%Y-%m-%d').strftime('%A')
 
             cursor.execute("""
-                SELECT availability_id
-                FROM TrainerAvailability
-                WHERE trainer_id = %s
-                  AND day_of_week = %s
-                  AND start_time <= %s
-                  AND end_time >= %s
+                SELECT availability_id FROM TrainerAvailability
+                WHERE trainer_id = %s AND day_of_week = %s
+                  AND start_time <= %s AND end_time >= %s
             """, (trainer_id, day_of_week, start_time, end_time))
 
             if not cursor.fetchone():
@@ -434,12 +434,9 @@ def schedule_training():
                 flash('Trainer not available at this time!', 'danger')
                 return redirect(url_for('schedule_training'))
 
-            # Check for conflicts
             cursor.execute("""
                 SELECT session_id FROM PersonalTrainingSession
-                WHERE trainer_id = %s
-                  AND session_date = %s
-                  AND status = 'Scheduled'
+                WHERE trainer_id = %s AND session_date = %s AND status = 'Scheduled'
                   AND (
                       (start_time <= %s AND end_time > %s) OR
                       (start_time < %s AND end_time >= %s) OR
@@ -453,14 +450,12 @@ def schedule_training():
                 flash('Trainer already has a session at this time!', 'danger')
                 return redirect(url_for('schedule_training'))
 
-            # Find available room
             cursor.execute("""
                 SELECT room_id FROM Room
                 WHERE room_type = 'Personal Training'
                   AND room_id NOT IN (
                       SELECT room_id FROM PersonalTrainingSession
-                      WHERE session_date = %s
-                        AND status = 'Scheduled'
+                      WHERE session_date = %s AND status = 'Scheduled'
                         AND (
                             (start_time <= %s AND end_time > %s) OR
                             (start_time < %s AND end_time >= %s) OR
@@ -468,8 +463,7 @@ def schedule_training():
                         )
                   )
                 LIMIT 1
-            """, (session_date, start_time, start_time, end_time, end_time,
-                  start_time, end_time))
+            """, (session_date, start_time, start_time, end_time, end_time, start_time, end_time))
 
             room = cursor.fetchone()
             if not room:
@@ -477,14 +471,12 @@ def schedule_training():
                 flash('No rooms available at this time!', 'danger')
                 return redirect(url_for('schedule_training'))
 
-            room_id = room[0]
-
             cursor.execute("""
                 INSERT INTO PersonalTrainingSession
                     (member_id, trainer_id, room_id, session_date, start_time, end_time, status, notes)
                 VALUES (%s, %s, %s, %s, %s, %s, 'Scheduled', %s)
                 RETURNING session_id
-            """, (member_id, trainer_id, room_id, session_date, start_time, end_time, notes))
+            """, (member_id, trainer_id, room[0], session_date, start_time, end_time, notes))
 
             cursor.fetchone()
             conn.commit()
@@ -508,12 +500,10 @@ def schedule_training():
         cursor = conn.cursor()
         cursor.execute("""
             SELECT trainer_id, first_name, last_name, specialization
-            FROM Trainer
-            ORDER BY trainer_id
+            FROM Trainer ORDER BY trainer_id
         """)
         trainers = cursor.fetchall()
         cursor.close()
-
         return render_template('member/schedule_training.html', trainers=trainers)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -525,7 +515,6 @@ def schedule_training():
 @app.route('/member/classes', methods=['GET', 'POST'])
 @login_required('member')
 def member_classes():
-    """View and register for classes"""
     member_id = session['user_id']
 
     if request.method == 'POST':
@@ -579,7 +568,6 @@ def member_classes():
         """)
         classes = cursor.fetchall()
         cursor.close()
-
         return render_template('member/classes.html', classes=classes)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -594,9 +582,9 @@ def member_classes():
 
 @app.route('/trainer/login', methods=['GET', 'POST'])
 def trainer_login():
-    """Trainer login using hashed password"""
+    """Trainer login — works for both DML plain-text and hashed passwords"""
     if request.method == 'POST':
-        email = request.form.get('email')
+        email    = request.form.get('email')
         password = request.form.get('password')
 
         conn = None
@@ -610,8 +598,8 @@ def trainer_login():
             user = cursor.fetchone()
             cursor.close()
 
-            if user and check_password_hash(user[3], password):
-                session['user_id'] = user[0]
+            if user and verify_password(user[3], password):
+                session['user_id']   = user[0]
                 session['user_type'] = 'trainer'
                 session['user_name'] = f"{user[1]} {user[2]}"
                 flash(f'Welcome back, {user[1]}!', 'success')
@@ -630,7 +618,6 @@ def trainer_login():
 @app.route('/trainer/schedule')
 @login_required('trainer')
 def trainer_schedule():
-    """Trainer schedule view"""
     trainer_id = session['user_id']
     conn = None
 
@@ -670,15 +657,14 @@ def trainer_schedule():
             WHERE trainer_id = %s
             ORDER BY
                 CASE day_of_week
-                    WHEN 'Monday' THEN 1
-                    WHEN 'Tuesday' THEN 2
+                    WHEN 'Monday'    THEN 1
+                    WHEN 'Tuesday'   THEN 2
                     WHEN 'Wednesday' THEN 3
-                    WHEN 'Thursday' THEN 4
-                    WHEN 'Friday' THEN 5
-                    WHEN 'Saturday' THEN 6
-                    WHEN 'Sunday' THEN 7
-                END,
-                start_time
+                    WHEN 'Thursday'  THEN 4
+                    WHEN 'Friday'    THEN 5
+                    WHEN 'Saturday'  THEN 6
+                    WHEN 'Sunday'    THEN 7
+                END, start_time
         """, (trainer_id,))
         availability = cursor.fetchall()
         cursor.close()
@@ -697,13 +683,12 @@ def trainer_schedule():
 @app.route('/trainer/availability', methods=['GET', 'POST'])
 @login_required('trainer')
 def trainer_availability():
-    """Set trainer availability"""
     trainer_id = session['user_id']
 
     if request.method == 'POST':
         day_of_week = request.form.get('day_of_week')
-        start_time = request.form.get('start_time')
-        end_time = request.form.get('end_time')
+        start_time  = request.form.get('start_time')
+        end_time    = request.form.get('end_time')
 
         conn = None
         try:
@@ -717,7 +702,6 @@ def trainer_availability():
             cursor.close()
             flash('Availability set successfully!', 'success')
             return redirect(url_for('trainer_schedule'))
-
         except Exception as e:
             if conn:
                 conn.rollback()
@@ -731,7 +715,6 @@ def trainer_availability():
 @app.route('/trainer/members')
 @login_required('trainer')
 def trainer_members():
-    """View trainer's members"""
     trainer_id = session['user_id']
     conn = None
 
@@ -747,7 +730,6 @@ def trainer_members():
         """, (trainer_id,))
         members = cursor.fetchall()
         cursor.close()
-
         return render_template('trainer/members.html', members=members)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -759,7 +741,6 @@ def trainer_members():
 @app.route('/trainer/member/<int:member_id>')
 @login_required('trainer')
 def trainer_member_detail(member_id):
-    """View member details"""
     conn = None
 
     try:
@@ -774,26 +755,21 @@ def trainer_member_detail(member_id):
 
         cursor.execute("""
             SELECT weight, height, heart_rate, blood_pressure, body_fat_percentage, recorded_date
-            FROM HealthMetric
-            WHERE member_id = %s
-            ORDER BY recorded_date DESC
-            LIMIT 1
+            FROM HealthMetric WHERE member_id = %s
+            ORDER BY recorded_date DESC LIMIT 1
         """, (member_id,))
         metric = cursor.fetchone()
 
         cursor.execute("""
             SELECT goal_type, current_value, target_value, target_date
-            FROM FitnessGoal
-            WHERE member_id = %s AND status = 'Active'
+            FROM FitnessGoal WHERE member_id = %s AND status = 'Active'
         """, (member_id,))
         goals = cursor.fetchall()
         cursor.close()
 
         return render_template('trainer/member_detail.html',
-                               member=member,
-                               metric=metric,
-                               goals=goals,
-                               member_id=member_id)
+                               member=member, metric=metric,
+                               goals=goals, member_id=member_id)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('trainer_members'))
@@ -807,9 +783,9 @@ def trainer_member_detail(member_id):
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
-    """Admin login using hashed password"""
+    """Admin login — works for both DML plain-text and hashed passwords"""
     if request.method == 'POST':
-        email = request.form.get('email')
+        email    = request.form.get('email')
         password = request.form.get('password')
 
         conn = None
@@ -823,8 +799,8 @@ def admin_login():
             user = cursor.fetchone()
             cursor.close()
 
-            if user and check_password_hash(user[3], password):
-                session['user_id'] = user[0]
+            if user and verify_password(user[3], password):
+                session['user_id']   = user[0]
                 session['user_type'] = 'admin'
                 session['user_name'] = f"{user[1]} {user[2]}"
                 flash(f'Welcome back, {user[1]}!', 'success')
@@ -843,7 +819,6 @@ def admin_login():
 @app.route('/admin/dashboard')
 @login_required('admin')
 def admin_dashboard():
-    """Admin dashboard"""
     conn = None
 
     try:
@@ -884,19 +859,14 @@ def admin_dashboard():
 @app.route('/admin/rooms')
 @login_required('admin')
 def admin_rooms():
-    """Room management"""
     conn = None
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT room_id, room_name, capacity, room_type
-            FROM Room ORDER BY room_id
-        """)
+        cursor.execute("SELECT room_id, room_name, capacity, room_type FROM Room ORDER BY room_id")
         rooms = cursor.fetchall()
         cursor.close()
-
         return render_template('admin/rooms.html', rooms=rooms)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -908,9 +878,8 @@ def admin_rooms():
 @app.route('/admin/equipment', methods=['GET', 'POST'])
 @login_required('admin')
 def admin_equipment():
-    """Equipment management"""
     if request.method == 'POST':
-        action = request.form.get('action')
+        action       = request.form.get('action')
         equipment_id = request.form.get('equipment_id')
         conn = None
 
@@ -920,19 +889,16 @@ def admin_equipment():
 
             if action == 'update_status':
                 status = request.form.get('status')
-                notes = request.form.get('notes')
+                notes  = request.form.get('notes')
                 cursor.execute("""
                     UPDATE Equipment
-                    SET status = %s,
-                        maintenance_notes = %s,
-                        last_maintenance_date = CURRENT_DATE
+                    SET status = %s, maintenance_notes = %s, last_maintenance_date = CURRENT_DATE
                     WHERE equipment_id = %s
                 """, (status, notes, equipment_id))
                 conn.commit()
                 flash('Equipment status updated!', 'success')
 
             cursor.close()
-
         except Exception as e:
             if conn:
                 conn.rollback()
@@ -956,7 +922,6 @@ def admin_equipment():
         """)
         equipment = cursor.fetchall()
         cursor.close()
-
         return render_template('admin/equipment.html', equipment=equipment)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -968,7 +933,6 @@ def admin_equipment():
 @app.route('/admin/billing', methods=['GET', 'POST'])
 @login_required('admin')
 def admin_billing():
-    """Billing management"""
     if request.method == 'POST':
         action = request.form.get('action')
         conn = None
@@ -978,10 +942,10 @@ def admin_billing():
             cursor = conn.cursor()
 
             if action == 'generate_bill':
-                member_id = request.form.get('member_id')
+                member_id   = request.form.get('member_id')
                 description = request.form.get('description')
-                amount = request.form.get('amount')
-                due_days = request.form.get('due_days')
+                amount      = request.form.get('amount')
+                due_days    = request.form.get('due_days')
                 cursor.execute("""
                     INSERT INTO Bill (member_id, due_date, total_amount, description)
                     VALUES (%s, CURRENT_DATE + INTERVAL '%s days', %s, %s)
@@ -990,9 +954,9 @@ def admin_billing():
                 flash('Bill generated successfully!', 'success')
 
             elif action == 'record_payment':
-                bill_id = request.form.get('bill_id')
-                amount = request.form.get('amount')
-                method = request.form.get('payment_method')
+                bill_id   = request.form.get('bill_id')
+                amount    = request.form.get('amount')
+                method    = request.form.get('payment_method')
                 reference = request.form.get('reference')
                 cursor.execute("""
                     INSERT INTO Payment (bill_id, amount, payment_method, transaction_reference)
@@ -1002,7 +966,6 @@ def admin_billing():
                 flash('Payment recorded successfully!', 'success')
 
             cursor.close()
-
         except Exception as e:
             if conn:
                 conn.rollback()
@@ -1023,12 +986,10 @@ def admin_billing():
                    b.status, b.description
             FROM Bill b
             JOIN Member m ON b.member_id = m.member_id
-            ORDER BY b.bill_date DESC
-            LIMIT 50
+            ORDER BY b.bill_date DESC LIMIT 50
         """)
         bills = cursor.fetchall()
         cursor.close()
-
         return render_template('admin/billing.html', bills=bills)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -1058,10 +1019,6 @@ def page_not_found(e):
 def internal_error(e):
     return render_template('errors/500.html'), 500
 
-
-# ============================================================================
-# APPLICATION ENTRY POINT
-# ============================================================================
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
