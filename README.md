@@ -1,6 +1,6 @@
 # 🏋️ Full-Stack Fitness Club Management System
 
-A comprehensive web-based fitness club management platform built with **Python Flask** and **PostgreSQL**, deployed live on Render. This full-stack application covers member self-service, trainer scheduling, and admin operations — all in one unified system.
+A comprehensive web-based fitness club management platform built with Python Flask and PostgreSQL. This full-stack application demonstrates professional software development practices including database design, RESTful architecture, and modern UI/UX design.
 
 🔗 **Live Demo:** [full-stack-fitness-club-management.onrender.com](https://full-stack-fitness-club-management.onrender.com)
 
@@ -24,7 +24,7 @@ A comprehensive web-based fitness club management platform built with **Python F
 
 ## Overview
 
-This platform simulates a real-world fitness club management system with three distinct user portals — **Members**, **Trainers**, and **Admins** — each with tailored dashboards and functionality. Built as a full-stack project, it demonstrates end-to-end software development: relational database design, server-side routing, session-based authentication, and a responsive front-end.
+This platform simulates a real-world fitness club management system with three distinct user portals: **Members**, **Trainers**, and **Admins**, each with tailored dashboards and functionality. Built as a full-stack project, it demonstrates end-to-end software development: relational database design, server-side routing, session-based authentication, and a responsive front-end.
 
 ---
 
@@ -46,9 +46,9 @@ This platform simulates a real-world fitness club management system with three d
 
 ### 🛠️ Admin Portal
 - Dashboard with system-wide stats: total members, trainers, upcoming classes, pending revenue
-- Room management — view all rooms and capacities
-- Equipment management — update maintenance status and notes
-- Billing — generate bills for members and record payments
+- Room management: view all rooms and capacities
+- Equipment management: update maintenance status and notes
+- Billing: generate bills for members and record payments
 
 ---
 
