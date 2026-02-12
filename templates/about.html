@@ -13,16 +13,16 @@
                         <div class="col-md-4 text-center mb-4 mb-md-0">
                             <img src="https://via.placeholder.com/200" alt="Developer Photo" 
                                  class="img-fluid rounded-circle shadow mb-3">
-                            <h3 class="fw-bold">Your Name</h3>
+                            <h3 class="fw-bold">Sammy Eyongorock</h3>
                             <p class="text-muted">Full-Stack Developer</p>
                             <div class="social-links">
-                                <a href="https://github.com/yourusername" target="_blank" class="btn btn-outline-dark btn-sm mx-1">
+                                <a href="https://github.com/SammyEyongorock" target="_blank" class="btn btn-outline-dark btn-sm mx-1">
                                     <i class="fab fa-github"></i> GitHub
                                 </a>
-                                <a href="https://linkedin.com/in/yourprofile" target="_blank" class="btn btn-outline-primary btn-sm mx-1">
+                                <a href="https://linkedin.com/in/SammyEyongorock" target="_blank" class="btn btn-outline-primary btn-sm mx-1">
                                     <i class="fab fa-linkedin"></i> LinkedIn
                                 </a>
-                                <a href="mailto:your.email@example.com" class="btn btn-outline-danger btn-sm mx-1">
+                                <a href="mailto:sammy.eyongorock@example.com" class="btn btn-outline-danger btn-sm mx-1">
                                     <i class="fas fa-envelope"></i> Email
                                 </a>
                             </div>
@@ -39,14 +39,28 @@
                                 The system manages all aspects of a fitness club including member registration, 
                                 trainer scheduling, class management, equipment tracking, and billing operations.
                             </p>
-                            <a href="https://github.com/yourusername/fitness-club" target="_blank" class="btn btn-primary">
+                            <a href="https://github.com/SammyEyongorock/fitness-club" target="_blank" class="btn btn-primary">
                                 <i class="fab fa-github"></i> View Source Code
                             </a>
-                            <a href="path/to/resume.pdf" target="_blank" class="btn btn-outline-primary">
+                            <a href="{{ url_for('static', filename='resume.pdf') }}" target="_blank" class="btn btn-outline-primary">
                                 <i class="fas fa-file-pdf"></i> Download Resume
                             </a>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Developer Bio -->
+            <div class="card shadow mb-5">
+                <div class="card-header bg-secondary text-white">
+                    <h4 class="mb-0"><i class="fas fa-user"></i> About Me</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        I am a third-year Software Engineering student and full-stack developer with experience building web applications, 
+                        implementing database-driven systems, and developing interactive GUIs. My work emphasizes clean code, maintainable architecture, 
+                        and delivering features that balance performance and usability.
+                    </p>
                 </div>
             </div>
 
@@ -171,10 +185,10 @@
                     <h3 class="fw-bold mb-3">Interested in Working Together?</h3>
                     <p class="lead mb-4">I'm always open to discussing new opportunities and exciting projects!</p>
                     <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                        <a href="mailto:your.email@example.com" class="btn btn-light btn-lg">
+                        <a href="mailto:sammy.eyongorock@example.com" class="btn btn-light btn-lg">
                             <i class="fas fa-envelope"></i> Get In Touch
                         </a>
-                        <a href="path/to/resume.pdf" target="_blank" class="btn btn-outline-light btn-lg">
+                        <a href="{{ url_for('static', filename='resume.pdf') }}" target="_blank" class="btn btn-outline-light btn-lg">
                             <i class="fas fa-download"></i> Download Resume
                         </a>
                     </div>
