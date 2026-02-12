@@ -1,70 +1,103 @@
 """
 Health and Fitness Club Management System - Flask Web Application
-A comprehensive web-based fitness club management platform
+Updated for secure password handling and robust connection pooling
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from functools import wraps
-from datetime import datetime, date, time
+from datetime import datetime
 import os
+import atexit
 from psycopg_pool import ConnectionPool
+from werkzeug.security import generate_password_hash, check_password_hash
+from urllib.parse import urlparse, parse_qs, urlunparse, urlencode
 
-
-app = Flask(__name__)
+# Fix static folder path explicitly for Render
+app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get(
     'SECRET_KEY', 'dev-secret-key-change-in-production'
 )
 
+# ============================================================================
+# DATABASE CONNECTION POOL
+# ============================================================================
 
-# Database connection pool
 connection_pool = None
+
 
 def init_db_pool():
     global connection_pool
-
     database_url = os.environ.get("DATABASE_URL")
 
+    if not database_url:
+        # Fall back to individual env vars
+        database_url = (
+            f"host={os.environ.get('DB_HOST', 'localhost')} "
+            f"dbname={os.environ.get('DB_NAME', 'fitness_club')} "
+            f"user={os.environ.get('DB_USER', 'postgres')} "
+            f"password={os.environ.get('DB_PASSWORD', '')} "
+            f"port={os.environ.get('DB_PORT', '5432')}"
+        )
+    else:
+        # SSL-safe for Render — add sslmode=require if not already present
+        if database_url.startswith("postgres://") or database_url.startswith("postgresql://"):
+            url = urlparse(database_url)
+            qs = parse_qs(url.query)
+            if "sslmode" not in qs:
+                qs["sslmode"] = ["require"]
+            url = url._replace(query=urlencode(qs, doseq=True))
+            database_url = urlunparse(url)
+
     try:
-        if database_url:
-            connection_pool = ConnectionPool(
-                conninfo=database_url,
-                min_size=1,
-                max_size=20
-            )
-        else:
-            conninfo = (
-                f"host={os.environ.get('DB_HOST', 'localhost')} "
-                f"dbname={os.environ.get('DB_NAME', 'fitness_club')} "
-                f"user={os.environ.get('DB_USER', 'postgres')} "
-                f"password={os.environ.get('DB_PASSWORD')} "
-                f"port={os.environ.get('DB_PORT', '5432')}"
-            )
-
-            connection_pool = ConnectionPool(
-                conninfo=conninfo,
-                min_size=1,
-                max_size=20
-            )
-
-        print("✓ Database connection pool initialized")
+        connection_pool = ConnectionPool(
+            conninfo=database_url,
+            min_size=1,
+            max_size=5,
+            timeout=30,
+            reconnect_timeout=60
+        )
+        # Verify the pool works immediately on startup
+        conn = connection_pool.getconn()
+        connection_pool.putconn(conn)
+        print("✓ Database connection pool initialized and verified")
 
     except Exception as e:
         print(f"✗ Database initialization failed: {e}")
         raise
 
+
 def get_db_connection():
-    """Get connection from pool"""
+    """Get a connection from the pool."""
     return connection_pool.getconn()
 
 
 def return_db_connection(conn):
-    """Return connection to pool"""
-    connection_pool.putconn(conn)
+    """Return a connection to the pool safely."""
+    if conn is not None:
+        try:
+            connection_pool.putconn(conn)
+        except Exception as e:
+            print(f"Warning: could not return connection to pool: {e}")
 
-init_db_pool() 
 
-# Decorators for authentication
+def close_db_pool():
+    """Close all pool connections cleanly on shutdown."""
+    global connection_pool
+    if connection_pool:
+        try:
+            connection_pool.closeall()
+            print("✓ Database connection pool closed")
+        except Exception as e:
+            print(f"Warning: error closing pool: {e}")
 
+
+atexit.register(close_db_pool)
+init_db_pool()
+
+
+# ============================================================================
+# AUTHENTICATION DECORATORS
+# ============================================================================
 
 def login_required(user_type):
     """Decorator to require login for specific user types"""
@@ -78,30 +111,28 @@ def login_required(user_type):
         return decorated_function
     return decorator
 
+
 # ============================================================================
 # MAIN ROUTES
 # ============================================================================
 
-
 @app.route('/')
 def index():
-    """Landing page"""
     return render_template('index.html')
 
 
 @app.route('/about')
 def about():
-    """About the developer"""
     return render_template('about.html')
+
 
 # ============================================================================
 # MEMBER ROUTES
 # ============================================================================
 
-
 @app.route('/member/register', methods=['GET', 'POST'])
 def member_register():
-    """Member registration"""
+    """Member registration with hashed passwords"""
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -112,36 +143,40 @@ def member_register():
         phone = request.form.get('phone')
         address = request.form.get('address')
 
-        conn = get_db_connection()
+        conn = None
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             # Check if email exists
-            cursor.execute(
-                "SELECT email FROM Member WHERE email = %s", (email,))
+            cursor.execute("SELECT email FROM Member WHERE email = %s", (email,))
             if cursor.fetchone():
+                cursor.close()
                 flash('Email already registered!', 'danger')
                 return redirect(url_for('member_register'))
 
-            # Insert new member
+            # Insert new member with hashed password
+            hashed_pw = generate_password_hash(password)
             cursor.execute("""
-                INSERT INTO Member (email, password, first_name, last_name, date_of_birth, 
+                INSERT INTO Member (email, password, first_name, last_name, date_of_birth,
                                    gender, phone, address)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING member_id
-            """, (email, password, first_name, last_name, dob, gender, phone, address))
+            """, (email, hashed_pw, first_name, last_name, dob, gender, phone, address))
 
-            member_id = cursor.fetchone()[0]
+            cursor.fetchone()
             conn.commit()
+            cursor.close()
 
             flash(f"Registration successful! Welcome, {first_name}!", 'success')
             return redirect(url_for('member_login'))
-        
+
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
+            return redirect(url_for('member_register'))
         finally:
-            cursor.close()
             return_db_connection(conn)
 
     return render_template('member/register.html')
@@ -149,22 +184,23 @@ def member_register():
 
 @app.route('/member/login', methods=['GET', 'POST'])
 def member_login():
-    """Member login"""
+    """Member login using hashed password"""
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
 
-        conn = get_db_connection()
+        conn = None
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT member_id, first_name, last_name
-                FROM Member
-                WHERE email = %s AND password = %s
-            """, (email, password))
-
+                SELECT member_id, first_name, last_name, password
+                FROM Member WHERE email = %s
+            """, (email,))
             user = cursor.fetchone()
-            if user:
+            cursor.close()
+
+            if user and check_password_hash(user[3], password):
                 session['user_id'] = user[0]
                 session['user_type'] = 'member'
                 session['user_name'] = f"{user[1]} {user[2]}"
@@ -172,8 +208,10 @@ def member_login():
                 return redirect(url_for('member_dashboard'))
             else:
                 flash('Invalid credentials!', 'danger')
+
+        except Exception as e:
+            flash(f'Database error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
     return render_template('member/login.html')
@@ -184,23 +222,21 @@ def member_login():
 def member_dashboard():
     """Member dashboard"""
     member_id = session['user_id']
-    conn = get_db_connection()
+    conn = None
 
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Get dashboard data
         cursor.execute("""
             SELECT first_name, last_name, email, latest_weight, latest_heart_rate,
-                   last_metric_date, active_goals, upcoming_sessions, 
+                   last_metric_date, active_goals, upcoming_sessions,
                    classes_attended, pending_balance
             FROM MemberDashboard
             WHERE member_id = %s
         """, (member_id,))
-
         dashboard_data = cursor.fetchone()
 
-        # Get active goals
         cursor.execute("""
             SELECT goal_id, goal_type, current_value, target_value, target_date, status
             FROM FitnessGoal
@@ -209,7 +245,6 @@ def member_dashboard():
         """, (member_id,))
         goals = cursor.fetchall()
 
-        # Get upcoming sessions
         cursor.execute("""
             SELECT pts.session_id, pts.session_date, pts.start_time, pts.end_time,
                    t.first_name || ' ' || t.last_name as trainer_name,
@@ -217,15 +252,14 @@ def member_dashboard():
             FROM PersonalTrainingSession pts
             JOIN Trainer t ON pts.trainer_id = t.trainer_id
             JOIN Room r ON pts.room_id = r.room_id
-            WHERE pts.member_id = %s 
-              AND pts.session_date >= CURRENT_DATE 
+            WHERE pts.member_id = %s
+              AND pts.session_date >= CURRENT_DATE
               AND pts.status = 'Scheduled'
             ORDER BY pts.session_date, pts.start_time
             LIMIT 5
         """, (member_id,))
         sessions = cursor.fetchall()
 
-        # Get registered classes
         cursor.execute("""
             SELECT c.class_id, c.class_name, c.schedule_date, c.start_time, c.end_time,
                    t.first_name || ' ' || t.last_name as trainer_name,
@@ -233,20 +267,23 @@ def member_dashboard():
             FROM ClassRegistration cr
             JOIN Class c ON cr.class_id = c.class_id
             JOIN Trainer t ON c.trainer_id = t.trainer_id
-            WHERE cr.member_id = %s 
+            WHERE cr.member_id = %s
               AND c.schedule_date >= CURRENT_DATE
               AND cr.status = 'Registered'
             ORDER BY c.schedule_date, c.start_time
         """, (member_id,))
         classes = cursor.fetchall()
+        cursor.close()
 
         return render_template('member/dashboard.html',
                                dashboard=dashboard_data,
                                goals=goals,
                                sessions=sessions,
                                classes=classes)
+    except Exception as e:
+        flash(f'Error loading dashboard: {str(e)}', 'danger')
+        return redirect(url_for('index'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -258,18 +295,18 @@ def member_profile():
 
     if request.method == 'POST':
         action = request.form.get('action')
-        conn = get_db_connection()
+        conn = None
 
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             if action == 'update_info':
                 phone = request.form.get('phone')
                 address = request.form.get('address')
-
                 cursor.execute("""
-                    UPDATE Member 
-                    SET phone = %s, address = %s 
+                    UPDATE Member
+                    SET phone = %s, address = %s
                     WHERE member_id = %s
                 """, (phone, address, member_id))
                 conn.commit()
@@ -280,9 +317,8 @@ def member_profile():
                 target_value = request.form.get('target_value')
                 current_value = request.form.get('current_value')
                 target_date = request.form.get('target_date')
-
                 cursor.execute("""
-                    INSERT INTO FitnessGoal (member_id, goal_type, target_value, 
+                    INSERT INTO FitnessGoal (member_id, goal_type, target_value,
                                             current_value, target_date, status)
                     VALUES (%s, %s, %s, %s, %s, 'Active')
                 """, (member_id, goal_type, target_value, current_value, target_date))
@@ -296,9 +332,8 @@ def member_profile():
                 blood_pressure = request.form.get('blood_pressure')
                 body_fat = request.form.get('body_fat')
                 notes = request.form.get('notes')
-
                 cursor.execute("""
-                    INSERT INTO HealthMetric (member_id, weight, height, heart_rate, 
+                    INSERT INTO HealthMetric (member_id, weight, height, heart_rate,
                                              blood_pressure, body_fat_percentage, notes)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (member_id,
@@ -311,18 +346,21 @@ def member_profile():
                 conn.commit()
                 flash('Health metric recorded!', 'success')
 
+            cursor.close()
+
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
         return redirect(url_for('member_profile'))
 
-    # GET request - fetch profile data
-    conn = get_db_connection()
+    # GET
+    conn = None
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -331,9 +369,8 @@ def member_profile():
         """, (member_id,))
         profile = cursor.fetchone()
 
-        # Get health metrics history
         cursor.execute("""
-            SELECT metric_id, recorded_date, weight, heart_rate, blood_pressure, 
+            SELECT metric_id, recorded_date, weight, heart_rate, blood_pressure,
                    body_fat_percentage, notes
             FROM HealthMetric
             WHERE member_id = %s
@@ -342,7 +379,6 @@ def member_profile():
         """, (member_id,))
         metrics = cursor.fetchall()
 
-        # Get all goals
         cursor.execute("""
             SELECT goal_id, goal_type, current_value, target_value, target_date, status
             FROM FitnessGoal
@@ -350,13 +386,16 @@ def member_profile():
             ORDER BY created_date DESC
         """, (member_id,))
         goals = cursor.fetchall()
+        cursor.close()
 
         return render_template('member/profile.html',
                                profile=profile,
                                metrics=metrics,
                                goals=goals)
+    except Exception as e:
+        flash(f'Error loading profile: {str(e)}', 'danger')
+        return redirect(url_for('member_dashboard'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -373,31 +412,32 @@ def schedule_training():
         end_time = request.form.get('end_time')
         notes = request.form.get('notes')
 
-        conn = get_db_connection()
+        conn = None
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             # Check trainer availability
-            day_of_week = datetime.strptime(
-                session_date, '%Y-%m-%d').strftime('%A')
+            day_of_week = datetime.strptime(session_date, '%Y-%m-%d').strftime('%A')
 
             cursor.execute("""
                 SELECT availability_id
                 FROM TrainerAvailability
-                WHERE trainer_id = %s 
+                WHERE trainer_id = %s
                   AND day_of_week = %s
                   AND start_time <= %s
                   AND end_time >= %s
             """, (trainer_id, day_of_week, start_time, end_time))
 
             if not cursor.fetchone():
+                cursor.close()
                 flash('Trainer not available at this time!', 'danger')
                 return redirect(url_for('schedule_training'))
 
             # Check for conflicts
             cursor.execute("""
                 SELECT session_id FROM PersonalTrainingSession
-                WHERE trainer_id = %s 
+                WHERE trainer_id = %s
                   AND session_date = %s
                   AND status = 'Scheduled'
                   AND (
@@ -409,6 +449,7 @@ def schedule_training():
                   end_time, end_time, start_time, end_time))
 
             if cursor.fetchone():
+                cursor.close()
                 flash('Trainer already has a session at this time!', 'danger')
                 return redirect(url_for('schedule_training'))
 
@@ -432,35 +473,38 @@ def schedule_training():
 
             room = cursor.fetchone()
             if not room:
+                cursor.close()
                 flash('No rooms available at this time!', 'danger')
                 return redirect(url_for('schedule_training'))
 
             room_id = room[0]
 
-            # Book the session
             cursor.execute("""
-                INSERT INTO PersonalTrainingSession 
+                INSERT INTO PersonalTrainingSession
                     (member_id, trainer_id, room_id, session_date, start_time, end_time, status, notes)
                 VALUES (%s, %s, %s, %s, %s, %s, 'Scheduled', %s)
                 RETURNING session_id
             """, (member_id, trainer_id, room_id, session_date, start_time, end_time, notes))
 
-            session_id = cursor.fetchone()[0]
+            cursor.fetchone()
             conn.commit()
+            cursor.close()
 
             flash('Session booked successfully!', 'success')
             return redirect(url_for('member_dashboard'))
 
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
+            return redirect(url_for('schedule_training'))
         finally:
-            cursor.close()
             return_db_connection(conn)
 
-    # GET - show available trainers
-    conn = get_db_connection()
+    # GET
+    conn = None
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT trainer_id, first_name, last_name, specialization
@@ -468,10 +512,13 @@ def schedule_training():
             ORDER BY trainer_id
         """)
         trainers = cursor.fetchall()
+        cursor.close()
 
         return render_template('member/schedule_training.html', trainers=trainers)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('member_dashboard'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -483,12 +530,12 @@ def member_classes():
 
     if request.method == 'POST':
         class_id = request.form.get('class_id')
+        conn = None
 
-        conn = get_db_connection()
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
 
-            # Check if already registered
             cursor.execute("""
                 SELECT registration_id FROM ClassRegistration
                 WHERE member_id = %s AND class_id = %s
@@ -504,16 +551,19 @@ def member_classes():
                 conn.commit()
                 flash('Successfully registered for class!', 'success')
 
+            cursor.close()
+
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
-    # GET - show available classes
-    conn = get_db_connection()
+    # GET
+    conn = None
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT c.class_id, c.class_name, c.schedule_date, c.start_time, c.end_time,
@@ -528,35 +578,39 @@ def member_classes():
             ORDER BY c.schedule_date, c.start_time
         """)
         classes = cursor.fetchall()
+        cursor.close()
 
         return render_template('member/classes.html', classes=classes)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('member_dashboard'))
     finally:
-        cursor.close()
         return_db_connection(conn)
+
 
 # ============================================================================
 # TRAINER ROUTES
 # ============================================================================
 
-
 @app.route('/trainer/login', methods=['GET', 'POST'])
 def trainer_login():
-    """Trainer login"""
+    """Trainer login using hashed password"""
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
 
-        conn = get_db_connection()
+        conn = None
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT trainer_id, first_name, last_name
-                FROM Trainer
-                WHERE email = %s AND password = %s
-            """, (email, password))
-
+                SELECT trainer_id, first_name, last_name, password
+                FROM Trainer WHERE email = %s
+            """, (email,))
             user = cursor.fetchone()
-            if user:
+            cursor.close()
+
+            if user and check_password_hash(user[3], password):
                 session['user_id'] = user[0]
                 session['user_type'] = 'trainer'
                 session['user_name'] = f"{user[1]} {user[2]}"
@@ -564,8 +618,10 @@ def trainer_login():
                 return redirect(url_for('trainer_schedule'))
             else:
                 flash('Invalid credentials!', 'danger')
+
+        except Exception as e:
+            flash(f'Database error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
     return render_template('trainer/login.html')
@@ -576,12 +632,12 @@ def trainer_login():
 def trainer_schedule():
     """Trainer schedule view"""
     trainer_id = session['user_id']
-    conn = get_db_connection()
+    conn = None
 
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Get personal training sessions
         cursor.execute("""
             SELECT pts.session_id, pts.session_date, pts.start_time, pts.end_time,
                    m.first_name || ' ' || m.last_name as member_name,
@@ -596,7 +652,6 @@ def trainer_schedule():
         """, (trainer_id,))
         sessions = cursor.fetchall()
 
-        # Get group classes
         cursor.execute("""
             SELECT c.class_id, c.class_name, c.schedule_date, c.start_time, c.end_time,
                    r.room_name, c.current_enrollment, c.capacity
@@ -609,12 +664,11 @@ def trainer_schedule():
         """, (trainer_id,))
         classes = cursor.fetchall()
 
-        # Get availability
         cursor.execute("""
             SELECT availability_id, day_of_week, start_time, end_time
             FROM TrainerAvailability
             WHERE trainer_id = %s
-            ORDER BY 
+            ORDER BY
                 CASE day_of_week
                     WHEN 'Monday' THEN 1
                     WHEN 'Tuesday' THEN 2
@@ -627,13 +681,16 @@ def trainer_schedule():
                 start_time
         """, (trainer_id,))
         availability = cursor.fetchall()
+        cursor.close()
 
         return render_template('trainer/schedule.html',
                                sessions=sessions,
                                classes=classes,
                                availability=availability)
+    except Exception as e:
+        flash(f'Error loading schedule: {str(e)}', 'danger')
+        return redirect(url_for('index'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -648,24 +705,24 @@ def trainer_availability():
         start_time = request.form.get('start_time')
         end_time = request.form.get('end_time')
 
-        conn = get_db_connection()
+        conn = None
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
-
             cursor.execute("""
                 INSERT INTO TrainerAvailability (trainer_id, day_of_week, start_time, end_time)
                 VALUES (%s, %s, %s, %s)
             """, (trainer_id, day_of_week, start_time, end_time))
             conn.commit()
-
+            cursor.close()
             flash('Availability set successfully!', 'success')
             return redirect(url_for('trainer_schedule'))
 
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
     return render_template('trainer/availability.html')
@@ -674,13 +731,13 @@ def trainer_availability():
 @app.route('/trainer/members')
 @login_required('trainer')
 def trainer_members():
-    """View members"""
+    """View trainer's members"""
     trainer_id = session['user_id']
-    conn = get_db_connection()
+    conn = None
 
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
             SELECT DISTINCT m.member_id, m.first_name, m.last_name, m.email, m.phone
             FROM Member m
@@ -689,10 +746,13 @@ def trainer_members():
             ORDER BY m.last_name, m.first_name
         """, (trainer_id,))
         members = cursor.fetchall()
+        cursor.close()
 
         return render_template('trainer/members.html', members=members)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('trainer_schedule'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -700,21 +760,18 @@ def trainer_members():
 @login_required('trainer')
 def trainer_member_detail(member_id):
     """View member details"""
-    trainer_id = session['user_id']
-    conn = get_db_connection()
+    conn = None
 
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Get member info
         cursor.execute("""
             SELECT first_name, last_name, email, date_of_birth, phone
-            FROM Member
-            WHERE member_id = %s
+            FROM Member WHERE member_id = %s
         """, (member_id,))
         member = cursor.fetchone()
 
-        # Get latest health metric
         cursor.execute("""
             SELECT weight, height, heart_rate, blood_pressure, body_fat_percentage, recorded_date
             FROM HealthMetric
@@ -724,46 +781,49 @@ def trainer_member_detail(member_id):
         """, (member_id,))
         metric = cursor.fetchone()
 
-        # Get active goals
         cursor.execute("""
             SELECT goal_type, current_value, target_value, target_date
             FROM FitnessGoal
             WHERE member_id = %s AND status = 'Active'
         """, (member_id,))
         goals = cursor.fetchall()
+        cursor.close()
 
         return render_template('trainer/member_detail.html',
                                member=member,
                                metric=metric,
                                goals=goals,
                                member_id=member_id)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('trainer_members'))
     finally:
-        cursor.close()
         return_db_connection(conn)
+
 
 # ============================================================================
 # ADMIN ROUTES
 # ============================================================================
 
-
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
-    """Admin login"""
+    """Admin login using hashed password"""
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
 
-        conn = get_db_connection()
+        conn = None
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT admin_id, first_name, last_name
-                FROM AdminStaff
-                WHERE email = %s AND password = %s
-            """, (email, password))
-
+                SELECT admin_id, first_name, last_name, password
+                FROM AdminStaff WHERE email = %s
+            """, (email,))
             user = cursor.fetchone()
-            if user:
+            cursor.close()
+
+            if user and check_password_hash(user[3], password):
                 session['user_id'] = user[0]
                 session['user_type'] = 'admin'
                 session['user_name'] = f"{user[1]} {user[2]}"
@@ -771,8 +831,10 @@ def admin_login():
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash('Invalid credentials!', 'danger')
+
+        except Exception as e:
+            flash(f'Database error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
     return render_template('admin/login.html')
@@ -782,12 +844,12 @@ def admin_login():
 @login_required('admin')
 def admin_dashboard():
     """Admin dashboard"""
-    conn = get_db_connection()
+    conn = None
 
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Get statistics
         cursor.execute("SELECT COUNT(*) FROM Member")
         total_members = cursor.fetchone()[0]
 
@@ -795,24 +857,27 @@ def admin_dashboard():
         total_trainers = cursor.fetchone()[0]
 
         cursor.execute("""
-            SELECT COUNT(*) FROM Class 
+            SELECT COUNT(*) FROM Class
             WHERE schedule_date >= CURRENT_DATE AND status = 'Scheduled'
         """)
         upcoming_classes = cursor.fetchone()[0]
 
         cursor.execute("""
-            SELECT COALESCE(SUM(total_amount - amount_paid), 0) 
+            SELECT COALESCE(SUM(total_amount - amount_paid), 0)
             FROM Bill WHERE status = 'Pending'
         """)
         pending_revenue = cursor.fetchone()[0]
+        cursor.close()
 
         return render_template('admin/dashboard.html',
                                total_members=total_members,
                                total_trainers=total_trainers,
                                upcoming_classes=upcoming_classes,
                                pending_revenue=pending_revenue)
+    except Exception as e:
+        flash(f'Error loading dashboard: {str(e)}', 'danger')
+        return redirect(url_for('index'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -820,21 +885,23 @@ def admin_dashboard():
 @login_required('admin')
 def admin_rooms():
     """Room management"""
-    conn = get_db_connection()
+    conn = None
 
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
             SELECT room_id, room_name, capacity, room_type
-            FROM Room
-            ORDER BY room_id
+            FROM Room ORDER BY room_id
         """)
         rooms = cursor.fetchall()
+        cursor.close()
 
         return render_template('admin/rooms.html', rooms=rooms)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin_dashboard'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -845,15 +912,15 @@ def admin_equipment():
     if request.method == 'POST':
         action = request.form.get('action')
         equipment_id = request.form.get('equipment_id')
+        conn = None
 
-        conn = get_db_connection()
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             if action == 'update_status':
                 status = request.form.get('status')
                 notes = request.form.get('notes')
-
                 cursor.execute("""
                     UPDATE Equipment
                     SET status = %s,
@@ -864,20 +931,22 @@ def admin_equipment():
                 conn.commit()
                 flash('Equipment status updated!', 'success')
 
+            cursor.close()
+
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
         return redirect(url_for('admin_equipment'))
 
     # GET
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
             SELECT e.equipment_id, e.equipment_name, r.room_name, e.status,
                    e.last_maintenance_date, e.maintenance_notes
@@ -886,10 +955,13 @@ def admin_equipment():
             ORDER BY e.status DESC, e.equipment_name
         """)
         equipment = cursor.fetchall()
+        cursor.close()
 
         return render_template('admin/equipment.html', equipment=equipment)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin_dashboard'))
     finally:
-        cursor.close()
         return_db_connection(conn)
 
 
@@ -899,9 +971,10 @@ def admin_billing():
     """Billing management"""
     if request.method == 'POST':
         action = request.form.get('action')
+        conn = None
 
-        conn = get_db_connection()
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             if action == 'generate_bill':
@@ -909,7 +982,6 @@ def admin_billing():
                 description = request.form.get('description')
                 amount = request.form.get('amount')
                 due_days = request.form.get('due_days')
-
                 cursor.execute("""
                     INSERT INTO Bill (member_id, due_date, total_amount, description)
                     VALUES (%s, CURRENT_DATE + INTERVAL '%s days', %s, %s)
@@ -922,7 +994,6 @@ def admin_billing():
                 amount = request.form.get('amount')
                 method = request.form.get('payment_method')
                 reference = request.form.get('reference')
-
                 cursor.execute("""
                     INSERT INTO Payment (bill_id, amount, payment_method, transaction_reference)
                     VALUES (%s, %s, %s, %s)
@@ -930,21 +1001,22 @@ def admin_billing():
                 conn.commit()
                 flash('Payment recorded successfully!', 'success')
 
+            cursor.close()
+
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
         finally:
-            cursor.close()
             return_db_connection(conn)
 
         return redirect(url_for('admin_billing'))
 
     # GET
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
-
-        # Get all bills
         cursor.execute("""
             SELECT b.bill_id, m.first_name || ' ' || m.last_name as member_name,
                    b.bill_date, b.due_date, b.total_amount, b.amount_paid,
@@ -955,20 +1027,22 @@ def admin_billing():
             LIMIT 50
         """)
         bills = cursor.fetchall()
+        cursor.close()
 
         return render_template('admin/billing.html', bills=bills)
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin_dashboard'))
     finally:
-        cursor.close()
         return_db_connection(conn)
+
 
 # ============================================================================
 # UTILITY ROUTES
 # ============================================================================
 
-
 @app.route('/logout')
 def logout():
-    """Logout"""
     user_name = session.get('user_name', 'User')
     session.clear()
     flash(f'Goodbye, {user_name}!', 'info')
@@ -977,19 +1051,17 @@ def logout():
 
 @app.errorhandler(404)
 def page_not_found(e):
-    """404 error handler"""
     return render_template('errors/404.html'), 404
 
 
 @app.errorhandler(500)
 def internal_error(e):
-    """500 error handler"""
     return render_template('errors/500.html'), 500
 
-# ============================================================================
-# APPLICATION INITIALIZATION
-# ============================================================================
 
+# ============================================================================
+# APPLICATION ENTRY POINT
+# ============================================================================
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
